@@ -1,0 +1,5 @@
+*.log*
+test.py
+__pycache__
+*.egg-info
+*.zip
