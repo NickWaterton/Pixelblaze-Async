@@ -4,8 +4,9 @@ controlling one or more Pixelblaze LED controllers. Requires Python 3.6 and the 
 modules.
 
 **You need to be familiar with async programming and `asyncio` to use this as a library.**
+
 You can, however just use it as a stand alone MQTT interface, it is self contained if used this way.  
-See [# Pixelblaze Usage]
+See _Pixelblaze Usage_
 
 Primarity intended for providing an MQTT interface to a Pixelblaze, MQTT support is built in.
 
@@ -14,11 +15,11 @@ Can also be used as a stand alone async client for pixelblaze devices, without M
 The package to import is `pixelblaze_async`.
 
 ## Acknowledgements
-Many thanks to JEM (ZRanger1) who was the inspiration for this library
+Many thanks to JEM (ZRanger1) who was the inspiration for this library.  
 See https://github.com/zranger1/pixelblaze-client for the original.
 
 ## Current Version: v1.0.0
-Support for Pixelblaze's updated internal pattern sequencer.
+Support for Pixelblaze's updated internal pattern sequencer.  
 
 Support for starting the sequencer in either playlist or shuffle mode,
 and pausing and unpausing.   See API docs for `startSequencer()`, `pauseSequencer()` and
@@ -206,14 +207,15 @@ Sets the interval in milliseconds which the enumerator will wait without
 hearing from a Pixelblaze before removing it from the active devices list.        
 The default timeout is 30 (30 seconds).
 
-### devices
-Dictionary containing all discovered pixelblaze devices, key is the device id.
+#### devices
+A Dictionary containing all discovered pixelblaze devices, key is the device id.
 ```
 { id:   "address": ip_addr,
         "timestamp": received time,
         "sender_id": id,
         "sender_time": timestamp}
 ```
+NOTE this is a propety, not a method.
 
 ## class PixelblazeClient
 Asyncronous Class for interfaceing with pixelblaze devices, has integrated MQTT control.
@@ -252,12 +254,12 @@ loop.run_forever()
 This should only be called once.
 Websocket will automatically reconnect if the connection drops for some reason.
 
-### start_ws()
+#### start_ws()
 Alternative start function. Starts the websocket, but waits for it to connect, and for pixelblaze name to be found.  
 Useful in programs where you want to wait for the connection and name to be established before proceeding.  
 See examples for usage.
 
-### _stop()
+#### _stop()
 See Syncronous method `stop()`.
 Stops all processes, and closes the websocket. Can (should) be used at the end of your program.
 Connection can be restarted using `start()` again.
@@ -559,8 +561,8 @@ syncronous version of `_find_pattern_file`
 Utility method: Given the list of patterns and text name of a pattern, returns that pattern's ID.
 
 #### _MQTT_connected
-property that equals `True` or `False` if the MQTT broker is connected or not.
-**NOTE: This is a property, not a method***
+property that equals `True` or `False` if the MQTT broker is connected or not.  
+**NOTE: This is a property, not a method**
 
 #### _name_from_id(patterns, pid)
 Utility method: Given the list of patterns and pid of a pattern, returns that pattern's Name.
