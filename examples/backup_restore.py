@@ -170,6 +170,7 @@ class PixelblazeBackup(PixelblazeClient):
         if self.filename: 
             return self.check_filename(self.filename)
         await self.start_ws()
+        await self._stop()
         return self.check_filename(self.name)
         
     def check_filename(self, filename):
