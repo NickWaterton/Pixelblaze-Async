@@ -335,8 +335,8 @@ Returns the jpeg binary data or `None`.
 
 #### getSources(pattern)
 Gets source text for PID or name (compressed as LZString Uint8Array).  
-Currently not of much use.
-**This is not the same data as returned by `save_binary_file()`**
+Currently not of much use.  
+**This is not the same data as returned by `save_binary_file()`**  
 Returns the binary data or `None`.
 
 #### getSourcesText(pattern=None)
@@ -358,8 +358,8 @@ The binary data is in the format received from `save_binary_file()`.
 You can use this command to clone patterns from one pixelblaze to another.
 if `binary` is not given, then the current directory will be searched for a file `filename.bin`, if that is not
 found, then all `.bin` files will be searched for the string `filename` which should be a pattern name.  
-If a file is found, it is loaded to the pixelblaze, using the found filename as the PID (excluding the `.bin`).
-**This is not for loading `.epe` files**
+If a file is found, it is loaded to the pixelblaze, using the found filename as the PID (excluding the `.bin`).  
+**This is not for loading `.epe` files**  
 Returns either the PID loaded from the file, or `None` if not found.
 See `save_load_pattern.py` for an example use.
 

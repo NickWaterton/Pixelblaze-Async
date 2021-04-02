@@ -163,6 +163,7 @@ class PixelblazeBackup(PixelblazeClient):
                         restore_patterns[pid] = name 
             except Exception as e:
                 self.log.error(e)
+                restore_patterns = (file.filename:'Unknown' for file in myzip.infolist())
         return restore_patterns 
                
     async def get_filename(self, filename=None):
