@@ -155,15 +155,10 @@ class PixelblazeBackup(PixelblazeClient):
                 if not self.patterns:
                     restore_patterns = patterns.copy()
                 else:
-                    for pattern in self.patterns:
-                        pid, name = await self._get_pattern_id_and_name(pattern, patterns)
-                        if name is None:
-                            self.log.warning('pattern {} not found in {}'.format(pattern, self.filename))
-                            continue
-                        restore_patterns[pid] = name 
+                    restore_patterns = {pid:name for p in self.patterns for pid, name in patterns.items() if p in [pid, name]}
             except Exception as e:
                 self.log.error(e)
-                restore_patterns = (file.filename:'Unknown' for file in myzip.infolist())
+                restore_patterns = {file.filename:'Unknown' for file in myzip.infolist()}
         return restore_patterns 
                
     async def get_filename(self, filename=None):
