@@ -32,9 +32,10 @@
  
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
+ N Waterton V 1.0.1 5the April 20201: made pixelblaze_ip a list
 '''
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import sys
 import logging
@@ -73,15 +74,16 @@ def main():
     loop = asyncio.get_event_loop()
     loop.set_debug(arg.debug)
     
-    pb = PixelblazeClient(arg.pixelblaze_ip, arg.user, arg.password, arg.broker, arg.port, arg.topic, arg.feedback, arg.json_out, poll=arg.poll_interval)
+    pbs = [PixelblazeClient(ip, arg.user, arg.password, arg.broker, arg.port, arg.topic, arg.feedback, arg.json_out, poll=arg.poll_interval) for ip in arg.pixelblaze_ip]
     
     try:
-        asyncio.gather(pb.start(), return_exceptions=True)
+        asyncio.gather(*[pb.start() for pb in pbs], return_exceptions=True)
         loop.run_forever()
             
     except (KeyboardInterrupt, SystemExit):
         log.info("System exit Received - Exiting program")
-        pb.stop()
+        for pb in pbs:
+            pb.stop()
         
     finally:
         pass

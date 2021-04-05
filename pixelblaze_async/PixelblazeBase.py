@@ -32,9 +32,10 @@
  
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
+ N Waterton V 1.0.1 5th april 2021: Minor fixes.
 '''
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import sys, re, os
 from ast import literal_eval
@@ -69,7 +70,7 @@ class PixelblazeBase():
 
     invalid_commands = ['start', 'stop', 'subscribe', 'start_ws']
     
-    __version__ = "1.0"
+    __version__ = "1.0.1"
 
     def __init__(self, pixelblaze_ip=None,
                        user=None,
@@ -107,6 +108,7 @@ class PixelblazeBase():
         self.topic_override = None    #override for publish topic
         self.pubtopic = pubtopic
         self.publish_name = True
+        self._publish_enabled = True
         self.json_out=json_out
         self.delimiter = '\='
         self.name = None
@@ -178,6 +180,15 @@ class PixelblazeBase():
             topic = topic.replace('//','/')
             self.log.info('subscribing to: {}'.format(topic))
             self.mqttc.subscribe(topic, qos)
+            
+    def unsubscribe(self, topic):
+        '''
+        utiltity to unsubscribe from an MQTT topic
+        '''
+        if self._MQTT_connected:
+            topic = topic.replace('//','/')
+            self.log.info('unsubscribing from: {}'.format(topic))
+            self.mqttc.unsubscribe(topic)
         
     @property
     def _MQTT_connected(self):
@@ -218,7 +229,7 @@ class PixelblazeBase():
         return pubtopic
             
     def _publish(self, topic=None, message=None):
-        if self.mqttc is not None and message is not None:
+        if self.mqttc is not None and message is not None and self._publish_enabled:
             pubtopic = self._get_pubtopic(topic)
             self.log.info("publishing item: {}: {}".format(pubtopic, self._truncate_bytes(message)))
             self.mqttc.publish(pubtopic, str(message))
@@ -757,6 +768,9 @@ class PixelblazeBase():
             await asyncio.sleep(1)
 
     async def start(self):
+        if not self.ip:
+            self.log.critical('Must specify an ip address to connect to')
+            return
         if self.tasks: return
         try:
             self._exit = False

@@ -26,9 +26,10 @@
  
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
+ N Waterton v 1.0.1 5th April 2021: Changed pixelblaze_ip to be a list of ip's
 '''
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import sys
 import logging
@@ -43,10 +44,12 @@ def parse_args():
         description='Forward MQTT data to Pixelblaze controller')
     parser.add_argument(
         'pixelblaze_ip',
+        nargs='*',
         action='store',
         type=str,
+        const=None,
         default=None,
-        help='ipaddress of pixelblaze controller (default: %(default)s)')
+        help='ipaddress of pixelblaze controller (or list of controllers) (default: %(default)s)')
     parser.add_argument(
         '-t', '--topic',
         action='store',

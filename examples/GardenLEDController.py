@@ -10,7 +10,7 @@ Working Example
 N Waterton V 1.0 16th March 2021: Initial release
 '''
  
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import sys
 import logging
@@ -18,8 +18,10 @@ import asyncio
 
 try:
     from pixelblaze_async.PixelblazeClient import PixelblazeClient
+    from pixelblaze_async.PixelblazeEnumerator import PixelblazeEnumerator
 except (ImportError, ModuleNotFoundError):
     from PixelblazeClient import PixelblazeClient
+    from PixelblazeEnumerator import PixelblazeEnumerator
     
 class LEDController(PixelblazeClient):
     '''
@@ -27,7 +29,7 @@ class LEDController(PixelblazeClient):
     Add methods based on specific commands you want to use
     '''
     
-    __version__ = "1.0.0"
+    __version__ = "1.0.1"
     
     modes = {2: 'Slave to Controller',  #blank mode
              3: 'Rainbow',
@@ -172,8 +174,6 @@ class LEDController(PixelblazeClient):
                         await self.method_dict[k](v)
         return mode if result else None
         
-     
-        
     async def _LEDStrip_start(self):
         '''
         setup Pixelblase for my LED strip Control
@@ -184,12 +184,14 @@ class LEDController(PixelblazeClient):
             #this means normal commands with arguments won't work
             self.delimiter=','
             await self.start_ws()
+            #set log
+            self.log = logging.getLogger("Pixelblaze.{}.{}".format(__class__.__name__, self.name))
             #subscribe to topics (this application uses an existing topic scheme)
             #wait for MQTT connection
             if await self._waitForMQTT():
-                #subscribe to base topic (no pb name needed) for commands
-                self.subscribe('{}/#'.format(self.topic))
-                #subscribe to slave mode topic fro receiving rgb values
+                #subscribe to base topic (no pb name needed) for commands (other than in mode 2)
+                #self.subscribe('{}/#'.format(self.topic))
+                #subscribe to slave mode topic for receiving rgb values in mode 2
                 self.subscribe('{}/primary_rgb'.format(self.pubtopic))
             self.log.info('Set Active pattern')
             #set to slave mode on start up
@@ -203,7 +205,55 @@ class LEDController(PixelblazeClient):
                 
         except asyncio.CancelledError:
             pass
-                      
+            
+class PixelblazeFinder(PixelblazeEnumerator):
+
+    def __init__(self, arg, hostIP="0.0.0.0", log=None):
+        super().__init__(hostIP, log)
+        self.arg = arg
+        self.connections = {}
+        
+    #override _disconnect        
+    async def _disconnect(self):
+        for pb in self.connections.values():
+            await pb._stop()
+        await super()._disconnect()
+        
+    async def _LEDStrip_start(self):
+        '''
+        start LED strip discovery
+        '''
+        self.log.info('Starting LED Strip Enumerator')
+        self.enableTimesync()
+        self.loop.create_task(self.discovery())
+        await self.start()
+            
+    async def discovery(self):
+        '''
+        finds and connect/disconnect pixelblaze controllers
+        '''
+        self.log.info('Starting Pixelblaze discovery')
+        while not self._exit:
+            try:
+                #add new pb
+                for ip in [v["address"][0] for v in self.devices.values()]:
+                    if ip not in self.connections.keys():
+                        self.log.info('Adding pb: {}'.format(ip))
+                        self.connections[ip] = LEDController(ip, self.arg.user, self.arg.password, self.arg.broker, self.arg.port, self.arg.topic, self.arg.feedback, self.arg.json_out, poll=self.arg.poll_interval)
+                        await self.connections[ip]._LEDStrip_start()
+                        
+                #remove old pb        
+                for ip, pb in self.connections.copy().items():
+                    if ip not in [v["address"][0] for v in self.devices.values()]:
+                        self.log.info('Removing pb: {}'.format(ip))
+                        await pb._stop()    #note do NOT use pb.stop() here
+                        del self.connections[ip]
+                               
+                await asyncio.sleep(self.LIST_CHECK_INTERVAL)
+                        
+            except asyncio.CancelledError:
+                break
+        self.log.info('Exit Pixelblaze discovery')              
     
 def main():
     from pixelblaze_async.utils import parse_args, setup_logger
@@ -236,16 +286,20 @@ def main():
     loop = asyncio.get_event_loop()
     loop.set_debug(arg.debug)
     
-    pb = LEDController(arg.pixelblaze_ip, arg.user, arg.password, arg.broker, arg.port, arg.topic, arg.feedback, arg.json_out, poll=arg.poll_interval)
+    if arg.pixelblaze_ip:
+        pbs = [LEDController(ip, arg.user, arg.password, arg.broker, arg.port, arg.topic, arg.feedback, arg.json_out, poll=arg.poll_interval) for ip in arg.pixelblaze_ip]
+    else:
+        pbs = [PixelblazeFinder(arg)]
     
     try:
         #asyncio.gather(*[pb._LEDStrip_start(), pb_enum.start()])
-        asyncio.gather(pb._LEDStrip_start(), return_exceptions=True)    #uncomment if you don't want to run pb_enum
+        asyncio.gather(*[pb._LEDStrip_start() for pb in pbs], return_exceptions=True)    #uncomment if you don't want to run pb_enum
         loop.run_forever()
             
     except (KeyboardInterrupt, SystemExit):
         log.info("System exit Received - Exiting program")
-        pb.stop()
+        for pb in pbs:
+            pb.stop()
         
     finally:
         pass

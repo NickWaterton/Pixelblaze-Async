@@ -99,7 +99,7 @@ optional arguments:
 ```
 
 ### How to use with MQTT
-you should subscribe to the topic given in the constructor as `topic` (eg `/pixelblaze/feedback/#`, or `/pixelblaze/feedback/Pixelblaze_F8BD97/#` for a single pixelblaze).
+you should subscribe to the topic given in the constructor as `pubtopic` (eg `/pixelblaze/feedback/#`, or `/pixelblaze/feedback/Pixelblaze_F8BD97/#` for a single pixelblaze).
 All updates will be posted to this base topic.  
 The topic will be followed by the pixelblaze name (eg `Pixelblaze_F8BD97 `). Results of commands will also be followed by the command name. Genaral updates will have `update` at the end of the topic.
 
@@ -108,10 +108,12 @@ eg.
 /pixelblaze/feedback/Pixelblaze_F8BD97/update {"name":"Pixelblaze_F8BD97","brandName":"","pixelCount":60,"brightness":1,"maxBrightness":100,"colorOrder":"BGR","dataSpeed":2000000,"ledType":1,"sequenceTimer":15,"sequencerMode":0,"runSequencer":false,"simpleUiMode":false,"discoveryEnable":true,"timezone":"America/Toronto","autoOffEnable":false,"autoOffStart":"00:00","autoOffEnd":"00:00","exp":0,"ver":"3.12"}
 /pixelblaze/feedback/Pixelblaze_F8BD97/getHardwareConfig {"name":"Pixelblaze_F8BD97","brandName":"","pixelCount":60,"brightness":1,"maxBrightness":100,"colorOrder":"BGR","dataSpeed":2000000,"ledType":1,"sequenceTimer":15,"sequencerMode":0,"runSequencer":false,"simpleUiMode":false,"discoveryEnable":true,"timezone":"America/Toronto","autoOffEnable":false,"autoOffStart":"00:00","autoOffEnd":"00:00","exp":0,"ver":"3.12"}
 ```
-To send a command, publish to the topic given in the constructor as `pubtopic` followed by `all` for all pixelblases, or a specific name for just the one pixelblase
-to respond (eg `/pixelblaze/command/all`, or `/pixelblaze/command/Pixelblaze_F8BD97`). There are two formats, with and without arguments
+To send a command, publish to the topic given in the constructor as `topic` followed by `all` for all pixelblases, or a specific name for just the one pixelblase
+to respond (eg `/pixelblaze/command/all`, or `/pixelblaze/command/Pixelblaze_F8BD97`).  
+There are two formats, with and without arguments
 
 #### Examples:
+
 ##### With Arguments:
 ```
 mosquitto_pub -h <broker_ip> -t "/pixelblaze/command/Pixelblaze_F8BD97/sendUpdates" -m False
@@ -120,7 +122,7 @@ mosquitto_pub -h <broker_ip> -t "/pixelblaze/command/all/setActivePattern" -m "s
 mosquitto_pub -h 192.168.100.119 -t "/pixelblaze/command/all/setColorControl" -m "rgbPickerColor=(0.5,0,0)"
 mosquitto_pub -h 192.168.100.119 -t "/pixelblaze/command/all/setColorControl" -m "rgbPickerColor=(0.5,0,0)=True"
 ```
-if `rgbPickerColor` is the name of a colour control, `=True` will optionally save the value in flash (if `_enable_flash_save()` has been called) . 
+if `rgbPickerColor` is the name of a colour control, `=True` will optionally save the value in flash (if `enable_flash_save()` has been called) . 
 Note that arguments are seperated by `=` by default - eg (`g=0.3`, or `r=1.0`). This can be changed by setting `delimiter` to the string you want, this is a *regular expression* used in re.split.
 Default is `'\='` (the `=` has to be escaped with a `\` as it's a special character in regular expressions). 
 
@@ -153,11 +155,11 @@ Commands that change these settings will automatically clear the cache first.
 Cache can be disabled by setting this property to 0.
 
 # API Documentation
-(roughly alphabetical except for object constructors) also not complete, as I've added some (Will Update later).
+Roughly alphabetical except for object constructors.
 
 ## class PixelblazeEnumerator
 Asyncronous Discovery class for pixelblaze
-### PixelblazeEnumerator(addr, log)
+### PixelblazeEnumerator(addr='0.0.0.0', log=None)
 Create an object that listens continuously for Pixelblaze time and beacon
 packets, and maintains a list of visible Pixelblazes.  The PixelblazeEnumerator
 object also supports synchronizing time on multiple Pixelblazes to allows
@@ -176,7 +178,7 @@ Must be called to start listening for pixelblaze devices. Should only be called 
 example:
 ```
 loop = asyncio.get_event_loop()
-pb_enum = PixelblazeEnumerator(log=log)
+pb_enum = PixelblazeEnumerator()
 
 try:
     asyncio.gather(pb_enum.start(), return_exceptions=True)
@@ -210,12 +212,12 @@ The default timeout is 30 (30 seconds).
 #### devices
 A Dictionary containing all discovered pixelblaze devices, key is the device id.
 ```
-{ id:   "address": ip_addr,
-        "timestamp": received time,
-        "sender_id": id,
+{ id:   "address"    : ip_addr,
+        "timestamp"  : received time,
+        "sender_id"  : id,
         "sender_time": timestamp}
 ```
-NOTE this is a propety, not a method.
+**NOTE this is a propety, not a method.**
 
 ## class PixelblazeClient
 Asyncronous Class for interfaceing with pixelblaze devices, has integrated MQTT control.
@@ -577,6 +579,9 @@ Returns a pattern ID if passed either a valid ID or a text name
 
 #### subscribe(topic, qos=0)
 Subscribes to the topic (appended to the base topic passed in the class constructor)
+
+#### unsubscribe(topic)
+UnSsubscribes from the topic (appended to the base topic passed in the class constructor)
 
 
 

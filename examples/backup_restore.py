@@ -27,7 +27,7 @@ except (ImportError, ModuleNotFoundError):
     from PixelblazeClient import PixelblazeClient
     
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 def valid_ip(address):
     try: 
@@ -39,14 +39,14 @@ def valid_ip(address):
 class PixelblazeBackup(PixelblazeClient):
     '''
     backup/Restore patterns
-    NOTE this adds a file called 'index.txt' to the zip archive created, this contains the list of pid and names backed up
-    so there will always be one more file in the archive than there are patterns.
+    NOTE this adds a file called 'index.txt' (self.index_file) to the zip archive created, this contains the list
+    of pid and names backed up so there will always be one more file in the archive than there are patterns.
     You can retrieve and list from zip files missing `index.txt`, but the names of the patterns will not be displayed,
     just the PID's
-    'index.txt' is a text file that can be read as a reference for pid's to names in the archive.
+    'index.txt' (self.index_file) is a text file that can be read as a reference for pid's to names in the archive.
     '''
     
-    __version__ = "1.0.0"
+    __version__ = "1.0.1"
     
     
     def __init__(self, pixelblaze_ip=None, filename=None, patterns=None, action='list'):           
@@ -58,6 +58,7 @@ class PixelblazeBackup(PixelblazeClient):
                           'list'   : self.list_zip
                         }
         self.log.info('Action is: {}'.format(self.action))
+        self.index_file = 'index.txt'
         self.patterns = patterns
         
     def __await__(self):
@@ -78,7 +79,7 @@ class PixelblazeBackup(PixelblazeClient):
         try:
             backup_patterns = await self.get_backup_patterns()
             with ZipFile(self.filename, 'w') as myzip:
-                myzip.writestr('index.txt', json.dumps({pid: value[0] for pid, value in backup_patterns.items()}, indent=2))
+                myzip.writestr(self.index_file, json.dumps({pid: value[0] for pid, value in backup_patterns.items()}, indent=2))
                 for pid, value in backup_patterns.items():
                     myzip.writestr(pid, value[1])
                     self.log.info('Added {} {:30.30} to {}'.format(pid, value[0], self.filename))
@@ -97,7 +98,7 @@ class PixelblazeBackup(PixelblazeClient):
             restore_patterns = await self.get_patterns_to_restore()
             with ZipFile(self.filename) as myzip:
                 for pid, name in restore_patterns.items():
-                    if pid != 'index.txt':
+                    if pid != self.index_file:
                         self.log.info('Restoring {}, {:30.30} to {}'.format(pid, name, self.ip))
                         binary = myzip.read(pid) 
                         await self.load_binary_file(pid, binary)
@@ -128,6 +129,8 @@ class PixelblazeBackup(PixelblazeClient):
         try:
             if not self.patterns:
                 self.patterns = await self._get_patterns()
+            #backup_patterns = {pid_name[0]:(pid_name[1], await self.save_binary_file(pid_name[0])) for pid_name in[await self._get_pattern_id_and_name(p) for p in self.patterns] if all(pid_name)}
+            #This does the same as below, but may be a dictionary comprehension too far...
             for pattern in self.patterns:
                 pid, name = await self._get_pattern_id_and_name(pattern)
                 if not all([pid, name]):
@@ -150,7 +153,7 @@ class PixelblazeBackup(PixelblazeClient):
         restore_patterns = {}
         with ZipFile(self.filename) as myzip:
             try:
-                patterns_txt = myzip.read('index.txt')
+                patterns_txt = myzip.read(self.index_file)
                 patterns = json.loads(patterns_txt)
                 if not self.patterns:
                     restore_patterns = patterns.copy()
@@ -158,7 +161,7 @@ class PixelblazeBackup(PixelblazeClient):
                     restore_patterns = {pid:name for p in self.patterns for pid, name in patterns.items() if p in [pid, name]}
             except Exception as e:
                 self.log.error(e)
-                restore_patterns = {file.filename:'Unknown' for file in myzip.infolist()}
+                restore_patterns = {file.filename:'Unknown' for file in myzip.infolist() if file.filename != self.index_file}
         return restore_patterns 
                
     async def get_filename(self, filename=None):
@@ -187,12 +190,12 @@ class PixelblazeBackup(PixelblazeClient):
     def list_zip_contents(self):
         '''
         prety print zip file contants
-        uses 'index.txt' to look up pattern names from pid
+        uses 'index.txt' (self.index_file) to look up pattern names from pid
         '''
         with ZipFile(self.filename) as myzip:
             info = myzip.infolist()
             try:
-                patterns_txt = myzip.read('index.txt')
+                patterns_txt = myzip.read(self.index_file)
                 patterns = json.loads(patterns_txt)
             except Exception as e:
                 self.log.error(e)
