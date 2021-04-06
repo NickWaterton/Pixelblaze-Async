@@ -83,10 +83,13 @@ class PixelblazeBase():
                        timeout=30.0,
                        poll=0,
                        log=None):
+                       
+        self.autolog = False
         if log:
             self.log = log
         else:
             self.log = logging.getLogger("Pixelblaze.{}".format(__class__.__name__))
+            self.autolog = True
         self.debug = False
         if self.log.getEffectiveLevel() == logging.DEBUG:
             self.debug = True
@@ -117,7 +120,7 @@ class PixelblazeBase():
         self.auto_reconnect = False
         self.flash_save_enabled = False
         self._exit = False
-        self.tasks = []
+        self.tasks = {}
         self.cache = {}
         self.cache_timeout = 5  #5 second timeout on cache, set to 0 to disable cache
         self.polling = [self._get_hardware_config]
@@ -518,6 +521,8 @@ class PixelblazeBase():
         result = await self._ws_send({"getConfig": True}, expect=['name', 'activeProgram'], all=True, cache=True)
         if result and not self.name:
             self.name = result.get('name', self.name)   #update pixelblaze name
+            if self.autolog:
+                self.log = logging.getLogger("Pixelblaze.{}.{}".format(__class__.__name__, self.name))
         return result
         
     async def _get_active_pattern(self, name=False):
@@ -774,11 +779,11 @@ class PixelblazeBase():
         if self.tasks: return
         try:
             self._exit = False
-            self.tasks.append(self.loop.create_task(self._process_q()))
-            self.tasks.append(self.loop.create_task(self._setup_client()))
-            self.tasks.append(self.loop.create_task(self._pub_status()))
+            self.tasks['_process_q'] = self.loop.create_task(self._process_q())
+            self.tasks['_setup_client'] = self.loop.create_task(self._setup_client())
+            self.tasks['_pub_status'] = self.loop.create_task(self._pub_status())
             if self.poll:
-               self.tasks.append(self.loop.create_task(self._poll_status()))
+               self.tasks['_poll_status'] = self.loop.create_task(self._poll_status())
             await self.connect()
         except asyncio.CancelledError:
             pass     
@@ -792,12 +797,13 @@ class PixelblazeBase():
     async def _stop(self):
         self._exit = True
         await self.disconnect()
-        tasks = [t for t in asyncio.Task.all_tasks() if t is not asyncio.Task.current_task()]
+        #tasks = [t for t in asyncio.Task.all_tasks() if t is not asyncio.Task.current_task()]
+        tasks = [t for t in self.tasks.values() if t is not asyncio.Task.current_task()]
         [task.cancel() for task in tasks]
         self.log.info("Cancelling {} outstanding tasks".format(len(tasks)))
         await asyncio.gather(*tasks, return_exceptions=True)
 
-        self.tasks = []
+        self.tasks = {}
         self.ws = None
         if self._MQTT_connected:
             self.mqttc.disconnect()
@@ -809,7 +815,7 @@ class PixelblazeBase():
         if await self.getWSConnected(): return
         self.auto_reconnect = True
         try:
-            self.loop.create_task(self._async_websocket())
+            self.tasks['ws'] = self.loop.create_task(self._async_websocket())
         except asyncio.CancelledError:
             pass
         

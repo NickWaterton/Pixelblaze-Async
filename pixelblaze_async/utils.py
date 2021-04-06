@@ -27,15 +27,24 @@
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
  N Waterton v 1.0.1 5th April 2021: Changed pixelblaze_ip to be a list of ip's
+ N Waterton V 1.0.2 6th April 2021; added valid_ip
 '''
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
 import argparse
 import re, base64
+import ipaddress
+
+def valid_ip(address):
+    try: 
+        ipaddress.ip_address(address)
+        return True
+    except:
+        return False
 
 def parse_args():
     

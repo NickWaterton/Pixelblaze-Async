@@ -32,14 +32,12 @@
  
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
+ N Waterton V1.0.1 6th April 2021: Minor fixes, added deletePattern, setMaxBrightness, setName, setcolorOrder
 '''
 
 '''
-commands NOT implemented:
+commands NOT implemented yet:
     {'savePixelMap': bool}
-    {'name': 'name'}
-    {'maxBrightness': num, 'save': bool}  0-100
-    {'colorOrder': 'order'} 'BGR" etc
     {'ledType': num}
     {'brandName': 'name'}
     {'simpleUiMode': bool}
@@ -53,10 +51,9 @@ commands NOT implemented:
     {'autoOffEnd': 'hrs:mins'}
     {'upgradeVersion': "update" or "check", 'getUpgradeState': bool}
     {'getPlaylist': "_defaultplaylist_"}
-    {'deleteProgram': 'pid')
 '''
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import sys, json
 import base64
@@ -77,7 +74,7 @@ class PixelblazeClient(PixelblazeBase):
     commands for PixelblazeBase
     '''
     
-    __version__ = "1.0.0"
+    __version__ = "1.0.1"
     
     def __init__(self, pixelblase_ip=None,
                        user=None,
@@ -162,7 +159,7 @@ class PixelblazeClient(PixelblazeBase):
         """
         return await self._get_patterns()
 
-    async def setActivePatternId(self, pid):
+    async def setActivePatternId(self, pid, saveFlash=False):
         """
         Sets the active pattern by pattern ID, without the name lookup option
         supported by setActivePattern().  This method is faster and more
@@ -173,13 +170,14 @@ class PixelblazeClient(PixelblazeBase):
         available on the Pixelblaze.
         It does return True is the active pattern was set as requested, and False if it was not
         """
-        result = await self._ws_send({"activeProgramId" : pid}, expect='activeProgram')
+        save = self._get_save_value(saveFlash)
+        result = await self._ws_send({"activeProgramId" : pid, "save": save}, expect='activeProgram')
         return bool(result.get("activeProgramId") == pid) if result else False
 
-    async def setActivePattern(self, pattern):
+    async def setActivePattern(self, pattern, saveFlash=False):
         """Sets the currently running pattern, using either an ID or a text name"""
         pid = await self._get_pattern_id(pattern)
-        return await self.setActivePatternId(pid) if pid else None
+        return await self.setActivePatternId(pid, saveFlash) if pid else None
 
     async def getActivePattern(self):
         """
@@ -196,11 +194,25 @@ class PixelblazeClient(PixelblazeBase):
         object
         """
         return await self._get_active_pattern(name=True)
+                
+    async def deletePattern(self, pattern):
+        '''
+        deletes the pattern given by pattern (pid or name).
+        Note: if you delete the active pattern, it will continue to run,
+        it will just be deleted from the list of available patterns.
+        '''
+        pid = await self._get_pattern_id(pattern)
+        await self._ws_send({"deleteProgram": pid})
 
     async def setBrightness(self, n, saveFlash=False):
         """Set the Pixelblaze's global brightness.  Valid range is 0-1"""
         save = self._get_save_value(saveFlash)
         await self._ws_send({"brightness" : self._clamp(n), 'save': save})
+        
+    async def setMaxBrightness(self, n, saveFlash=False):
+        """Set the Pixelblaze's global Maximum brightness(%).  Valid range is 0-100"""
+        save = self._get_save_value(saveFlash)
+        await self._ws_send({"maxBrightness" : n, 'save': save})
         
     async def getBrightness(self):
         '''
@@ -375,6 +387,32 @@ class PixelblazeClient(PixelblazeBase):
         self._clear_cache()
         hw = await self.getHardwareConfig()
         return hw.get("pixelCount")
+        
+    async def setcolorOrder(self, order, saveFlash=False):
+        """
+        Sets colur order in strip, "BGR", "RGB" etc.
+        
+        Note that you must call _enable_flash_save() in order to use
+        the saveFlash parameter to make your new timing (semi) permanent.
+        """
+        save = self._get_save_value(saveFlash)
+        await self._ws_send({"colorOrder":order, "save":save})
+        self._clear_cache()
+        hw = await self.getHardwareConfig()
+        return hw.get("colorOrder")
+               
+    async def setName(self, name):
+        """
+        Sets the pixelblaze name (permenant)
+        unsubscribe from old name, subscribe to new name
+        """
+        self.unsubscribe('{}/{}/#'.format(self.topic, self.name))
+        await self._ws_send({"name" : name})
+        self.name = None
+        self._clear_cache()
+        hw = await self.getHardwareConfig()
+        self.subscribe('{}/{}/#'.format(self.topic, self.name))
+        return hw.get("name")
         
     async def getPreviewImg(self, pattern=None):
         """

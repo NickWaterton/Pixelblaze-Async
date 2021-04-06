@@ -9,6 +9,7 @@ Working Example using PixelblazeClient
  
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
+ N Waterton V1.0.1 6th April 20201; added valid_ip
 '''
 
 import sys, time
@@ -22,7 +23,7 @@ except (ImportError, ModuleNotFoundError):
     from PixelblazeClient import PixelblazeClient
     
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 class PixelblazeClone(PixelblazeClient):
     '''
@@ -134,7 +135,7 @@ def parse_args():
     return parser.parse_args()
     
 def main():
-    from pixelblaze_async.utils import setup_logger
+    from pixelblaze_async.utils import setup_logger, valid_ip
     arg = parse_args()
     
     if arg.debug:
@@ -166,7 +167,14 @@ def main():
     loop = asyncio.get_event_loop()
     loop.set_debug(arg.debug)
     
+    if not valid_ip(arg.source_ip)
+        log.critical('Must supply a valid source ip address, {} is not valid'.format(arg.source_ip))
+        return
+    
     for ip in arg.destination_ips:
+        if not valid_ip(ip)
+            log.critical('Must supply a valid destination ip address, {} is not valid'.format(ip))
+            return
         if arg.source_ip == ip:
             log.error("Can't clone from {} to the same destination ip!".format(arg.source_ip))
             return

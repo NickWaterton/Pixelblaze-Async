@@ -173,7 +173,7 @@ class LEDController(PixelblazeClient):
                     if k in self.method_dict.keys():
                         await self.method_dict[k](v)
         return mode if result else None
-        
+    
     async def _LEDStrip_start(self):
         '''
         setup Pixelblase for my LED strip Control
@@ -206,54 +206,73 @@ class LEDController(PixelblazeClient):
         except asyncio.CancelledError:
             pass
             
-class PixelblazeFinder(PixelblazeEnumerator):
+class PixelblazeConnector(PixelblazeEnumerator):
 
-    def __init__(self, arg, hostIP="0.0.0.0", log=None):
-        super().__init__(hostIP, log)
+    __version__ = '1.0.1'
+
+    def __init__(self, arg):
+        super().__init__()
         self.arg = arg
         self.connections = {}
         
-    #override _disconnect        
-    async def _disconnect(self):
-        for pb in self.connections.values():
-            await pb._stop()
-        await super()._disconnect()
-        
     async def _LEDStrip_start(self):
-        '''
-        start LED strip discovery
-        '''
-        self.log.info('Starting LED Strip Enumerator')
-        self.enableTimesync()
         self.loop.create_task(self.discovery())
-        await self.start()
-            
-    async def discovery(self):
-        '''
-        finds and connect/disconnect pixelblaze controllers
-        '''
-        self.log.info('Starting Pixelblaze discovery')
+
+    async def remove_devices(self):
+        #remove old pb
+        for ip, pb in self.connections.copy().items():
+            if ip not in [v["address"][0] for v in self.devices.values()]:
+                self.log.info('Removing pb: {}'.format(ip))
+                await pb._stop()    #note do NOT use pb.stop() here
+                del self.connections[ip]
+        
+    async def list_devices(self):
+        #list pb devices and status
         while not self._exit:
             try:
+                await self.remove_devices()
+                for k, v in self.connections.items():
+                    self.log.info('{}({}) connected: {}'.format(v.name, k, await v.getWSConnected()))
+                self.log.info('{} pixelblazes, {} connected'.format(len(self.connections), len([v for v in self.connections.values() if await v.getWSConnected()])))
+                await asyncio.sleep(self.LIST_CHECK_INTERVAL)
+            except asyncio.CancelledError:
+                break
+        
+    async def connect_pb(self, ip):
+        self.log.info('Adding pb: {}'.format(ip))
+        self.connections[ip] = LEDController(ip,    self.arg.user,
+                                                    self.arg.password,
+                                                    self.arg.broker,
+                                                    self.arg.port,
+                                                    self.arg.topic,
+                                                    self.arg.feedback,
+                                                    self.arg.json_out,
+                                                    poll=self.arg.poll_interval)
+        await self.connections[ip]._LEDStrip_start()
+
+    async def discovery(self):
+        '''
+        finds and connect/disconnect pixelblase controllers
+        '''
+        self.enableTimesync()
+        await self.start()
+        self.loop.create_task(self.list_devices())
+        while not self._exit:
+            try:
+                await self.new_data.wait()
                 #add new pb
                 for ip in [v["address"][0] for v in self.devices.values()]:
                     if ip not in self.connections.keys():
-                        self.log.info('Adding pb: {}'.format(ip))
-                        self.connections[ip] = LEDController(ip, self.arg.user, self.arg.password, self.arg.broker, self.arg.port, self.arg.topic, self.arg.feedback, self.arg.json_out, poll=self.arg.poll_interval)
-                        await self.connections[ip]._LEDStrip_start()
+                        await self.connect_pb(ip)
                         
-                #remove old pb        
-                for ip, pb in self.connections.copy().items():
-                    if ip not in [v["address"][0] for v in self.devices.values()]:
-                        self.log.info('Removing pb: {}'.format(ip))
-                        await pb._stop()    #note do NOT use pb.stop() here
-                        del self.connections[ip]
-                               
-                await asyncio.sleep(self.LIST_CHECK_INTERVAL)
-                        
+                self.new_data.clear()
+                
             except asyncio.CancelledError:
                 break
-        self.log.info('Exit Pixelblaze discovery')              
+            except Exception as e:
+                self.log.exception(e)
+                
+        self.log.info('Exit Pixelblaze discovery')  
     
 def main():
     from pixelblaze_async.utils import parse_args, setup_logger
@@ -289,11 +308,10 @@ def main():
     if arg.pixelblaze_ip:
         pbs = [LEDController(ip, arg.user, arg.password, arg.broker, arg.port, arg.topic, arg.feedback, arg.json_out, poll=arg.poll_interval) for ip in arg.pixelblaze_ip]
     else:
-        pbs = [PixelblazeFinder(arg)]
+        pbs = [PixelblazeConnector(arg)]
     
     try:
-        #asyncio.gather(*[pb._LEDStrip_start(), pb_enum.start()])
-        asyncio.gather(*[pb._LEDStrip_start() for pb in pbs], return_exceptions=True)    #uncomment if you don't want to run pb_enum
+        asyncio.gather(*[pb._LEDStrip_start() for pb in pbs], return_exceptions=True)
         loop.run_forever()
             
     except (KeyboardInterrupt, SystemExit):

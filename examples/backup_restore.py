@@ -11,6 +11,7 @@ NOTE: this implements a different way of using an async library!
  
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
+ N Waterton V1.0.2 6th April 20201; moved valid_ip to utils
 '''
 
 import sys, json
@@ -27,14 +28,7 @@ except (ImportError, ModuleNotFoundError):
     from PixelblazeClient import PixelblazeClient
     
 
-__version__ = "1.0.1"
-
-def valid_ip(address):
-    try: 
-        ipaddress.ip_address(address)
-        return True
-    except:
-        return False
+__version__ = "1.0.2"
 
 class PixelblazeBackup(PixelblazeClient):
     '''
@@ -262,7 +256,7 @@ def parse_args():
     return parser.parse_args()
     
 async def main():
-    from pixelblaze_async.utils import setup_logger
+    from pixelblaze_async.utils import setup_logger, valid_ip
     arg = parse_args()
     
     if arg.debug:

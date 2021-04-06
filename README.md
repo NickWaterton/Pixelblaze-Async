@@ -284,6 +284,11 @@ If pattern argument is not specified, checks the currently running pattern.
 Note that this can return `False` on a freshly started pixelblaze, until the active pattern has been set.  
 This function also will return `False` if the active pattern is not available.
 
+#### deletePattern(pattern):
+Deletes the pattern given by pattern (pid or name).  
+Note: if you delete the active pattern, it will continue to run, 
+it will just be deleted from the list of available patterns.
+
 #### getActivePattern()
 Returns the ID of the pattern currently running on
 the Pixelblaze if available.  Otherwise returns an empty dictionary
@@ -352,7 +357,7 @@ returns `True` or `False` if an upgrade is available, `None` if state could not 
 Returns a dictionary containing all vars exported from the active pattern
 
 #### getWSConnected()
-Retruns `True` or `False` if websocket is connected or not.
+Returns `True` or `False` if websocket is connected or not.
 
 #### load_binary_file(filename=None, binary=None)
 Loads the binary data passed to `binary` as a pattern file. `filename` should be the PID the file will be loaded as. 
@@ -404,20 +409,33 @@ Returns `None`.
 Sets updates on or off (preview, frame rate etc).  
 Returns `None`.
 
-#### setActivePattern(pid)
+#### setActivePattern(pid, saveFlash=False)
 Sets the currently running pattern, using either an ID or a text name.  
+To reduce wear on Pixelblaze's flash memory, the saveFlash parameter
+is ignored by default.  See documentation for `_enable_flash_save()` for
+more information.  
 Returns `True` if the active pattern was set successfuly, `False` if not, or `None` if the pattern was not found. 
 
-#### setActivePatternId(pid):
+#### setActivePatternId(pid, saveFlash=False):
 Sets the active pattern by pattern ID, without the name lookup option
 supported by `setActivePattern()`. This method is faster and more network efficient than `SetActivePattern()`
 if you already know a pattern's ID. It does not validate the input id, or determine if the pattern is
  available on the Pixelblaze.  
+To reduce wear on Pixelblaze's flash memory, the saveFlash parameter
+is ignored by default.  See documentation for `_enable_flash_save()` for
+more information.  
  Returns `True` if the active pattern was set successfuly, `False` otherwise.
 
 #### setBrightness(n, saveFlash=False)
-Set the Pixelblaze's global brightness.  Valid range is 0-1. 
- To reduce wear on Pixelblaze's flash memory, the saveFlash parameter
+Set the Pixelblaze's global brightness(%).  Valid range is 0-100. 
+To reduce wear on Pixelblaze's flash memory, the saveFlash parameter
+is ignored by default.  See documentation for `_enable_flash_save()` for
+more information.  
+Returns `None`.
+
+#### setMaxBrightness(n, saveFlash=False)
+Set the Pixelblaze's global Maximum brightness.  Valid range is 0-1. 
+To reduce wear on Pixelblaze's flash memory, the saveFlash parameter
 is ignored by default.  See documentation for `_enable_flash_save()` for
 more information.  
 Returns `None`.
@@ -450,8 +468,13 @@ by default.  See documentation for `_enable_flash_save()` for
 more information.
 returns `True` or `False` if the control was set.
 
+#### setcolorOrder(order, saveFlash=False):
+Sets colur order in strip, "BGR", "RGB" etc.
+Note that you must call _enable_flash_save() in order to use
+the saveFlash parameter to make your new timing (semi) permanent.
+
 #### setDataspeed(speed, saveFlash=False)
-Sets data speed for all types of LEDs.
+Sets data speed for all types of LEDs.  
 **CAUTION:** For advanced users only.  If you don't know
 exactly why you want to do this, DON'T DO IT.
 
@@ -462,6 +485,11 @@ Returns the current datasepeed.
 #### setIP(ip=None)
 if ip is given, sets the pixelblaze ip you are connected to. Restarts websocket with new ip.
 Returns the ip of the pixelblaze you are connected to
+
+#### setName(name)
+Sets the pixelblaze name (permenantly).
+if MQTT is in use, will unsubscribe from the old name topic, and subscribe to the new one
+Returns the new name.
 
 #### setpixelCount(num, saveFlash=False)
 Sets number of pixels in strip.  
@@ -474,9 +502,9 @@ returns `None`.
 
 #### startSequencer(mode=1)
 Enable and start the Pixelblaze's internal sequencer. The optional mode parameter
-can be
-1 - shuffle all patterns 
-2 - playlist mode
+can be:  
+1. - shuffle all patterns 
+2. - playlist mode
 The playlistmust be configured through the Pixelblaze's web UI.  
 Returns the current sequencer mode.
 

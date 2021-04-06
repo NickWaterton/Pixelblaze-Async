@@ -31,9 +31,10 @@
  
  MQTT interface for pixelblaze v3
  N Waterton V 1.0.0 16th March 2021: Initial release
+ N Waterton V 1.0.1 6th April 2021; Minor fixes
 '''
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import time, sys, struct
 import logging
@@ -83,7 +84,7 @@ class PixelblazeEnumerator:
     DEVICE_TIMEOUT = 30     #in seconds
     LIST_CHECK_INTERVAL = 5 #in seconds
 
-    __version__ = '1.0.0'
+    __version__ = '1.0.1'
 
     def __init__(self, hostIP="0.0.0.0", log=None):
         """    
@@ -103,6 +104,7 @@ class PixelblazeEnumerator:
         self._exit = False
         self.devices = {}
         self.autoSync = False
+        self.new_data = asyncio.Event()   #event trigger for new data
         # must run async self.start()
 
     def __del__(self):
@@ -167,14 +169,14 @@ class PixelblazeEnumerator:
     async def start(self):
         '''
         start UDP listener on self.hostIP address, port = self.PORT
-        and start updater. Blocking routine, does not exit.
+        and start updater.
         '''
         try:
             if self.transport: return 
             self.log.info('starting up UDP Server')
             self.transport, protocol = await self.loop.create_datagram_endpoint(
                 lambda: PixelblazeProtocol(self._process_data),local_addr=(self.hostIP, self.PORT))
-  
+            self.log.info('Pixelblaze Discovery Server listening on {}:{} '.format(self.hostIP, self.PORT))
             self.loop.create_task(self._updatePixelblazeList())
         except asyncio.CancelledError:
             pass
@@ -213,7 +215,7 @@ class PixelblazeEnumerator:
         Internal Method: Datagram listener thread handler -- loop and listen.
         """
         try:
-
+            self.new_data.clear()
             # when we receive a beacon packet from a Pixelblaze,
             # update device record and timestamp in our device list
             pkt = self._unpack_beacon(data)
@@ -221,6 +223,8 @@ class PixelblazeEnumerator:
                 self.autoSync = False
             elif pkt[0] == self.BEACON_PACKET:
                 #add pixelblaze to list of devices, pkt{1] is sender id
+                if pkt[1] not in self.devices.keys():
+                    self.log.info('Found Pixelblaze: {}'.format(addr))
                 self.devices[pkt[1]] = {"address"    : addr,
                                         "timestamp"  : time.time(),
                                         "sender_id"  : pkt[1],
@@ -229,6 +233,8 @@ class PixelblazeEnumerator:
                 # immediately send timesync if enabled
                 if self.autoSync:
                     self._send_timesync(pkt[1], pkt[2], addr)
+                    
+            self.new_data.set()        
             
         except Exception as e:
             self.log.exception(e)

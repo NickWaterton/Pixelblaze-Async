@@ -9,6 +9,7 @@ Working Example using PixelblazeEnumerator
  
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
+ N Waterton V1.0.1 6th april 2021: significant speedups
 '''
 
 import sys
@@ -23,7 +24,7 @@ except (ImportError, ModuleNotFoundError):
     from PixelblazeClient import PixelblazeClient
     from PixelblazeEnumerator import PixelblazeEnumerator
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 def parse_args():
     
@@ -97,35 +98,70 @@ def parse_args():
         version="%(prog)s ({})".format(__version__),
         help='Display version of this program')
     return parser.parse_args()
+    
+class PixelblazeConnector(PixelblazeEnumerator):
 
-async def pixelblaze_connector(pb_enum, arg):
-    '''
-    finds and connect/disconnect pixelblase controllers
-    '''
-    connections = {}
-    while not pb_enum._exit:
-        try:
-            #add new pb
-            for ip in [v["address"][0] for v in pb_enum.devices.values()]:
-                if ip not in connections.keys():
-                    log.info('Adding pb: {}'.format(ip))
-                    connections[ip] = PixelblazeClient(ip, arg.user, arg.password, arg.broker, arg.port, arg.topic, arg.feedback, arg.json_out, poll=arg.poll_interval, log=log)
-                    await connections[ip].start()
-                    
-            #remove old pb        
-            for ip, pb in connections.copy().items():
-                if ip not in [v["address"][0] for v in pb_enum.devices.values()]:
-                    log.info('Removing pb: {}'.format(ip))
-                    await pb._stop()    #note do NOT use pb.stop() here
-                    del connections[ip]
-                    
-            #list pb devices and status
-            for k, v in connections.items():
-                log.info('{}({}) connected: {}'.format(v.name, k, await v.getWSConnected()))
-            log.info('{} pixelblazes, {} connected'.format(len(connections), len([v for v in connections.values() if await v.getWSConnected()])))
-            await asyncio.sleep(pb_enum.LIST_CHECK_INTERVAL)
-        except asyncio.CancelledError:
-            break
+    __version__ = '1.0.1'
+
+    def __init__(self, arg):
+        super().__init__()
+        self.arg = arg
+        self.connections = {}
+        
+    async def remove_devices(self):
+        #remove old pb 
+        for ip, pb in self.connections.copy().items():
+            if ip not in [v["address"][0] for v in self.devices.values()]:
+                self.log.info('Removing pb: {}'.format(ip))
+                await pb._stop()    #note do NOT use pb.stop() here
+                del self.connections[ip]
+        
+    async def list_devices(self):
+        #list pb devices and status
+        while not self._exit:
+            try:
+                await self.remove_devices()
+                for k, v in self.connections.items():
+                    self.log.info('{}({}) connected: {}'.format(v.name, k, await v.getWSConnected()))
+                self.log.info('{} pixelblazes, {} connected'.format(len(self.connections), len([v for v in self.connections.values() if await v.getWSConnected()])))
+                await asyncio.sleep(self.LIST_CHECK_INTERVAL)
+            except asyncio.CancelledError:
+                break
+        
+    async def connect_pb(self, ip):
+        self.log.info('Adding pb: {}'.format(ip))
+        self.connections[ip] = PixelblazeClient(ip, self.arg.user,
+                                                    self.arg.password,
+                                                    self.arg.broker,
+                                                    self.arg.port,
+                                                    self.arg.topic,
+                                                    self.arg.feedback,
+                                                    self.arg.json_out,
+                                                    poll=self.arg.poll_interval)
+        await self.connections[ip].start()
+
+    async def discovery(self):
+        '''
+        finds and connect/disconnect pixelblase controllers
+        '''
+        await self.start()
+        self.loop.create_task(self.list_devices())
+        while not self._exit:
+            try:
+                await self.new_data.wait()
+                #add new pb
+                for ip in [v["address"][0] for v in self.devices.values()]:
+                    if ip not in self.connections.keys():
+                        await self.connect_pb(ip)
+                        
+                self.new_data.clear()
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                self.log.exception(e)
+                
+        self.log.info('Discovery exited')
 
 def main():
     try:
@@ -165,10 +201,10 @@ def main():
     loop.set_debug(arg.debug)
     
     
-    pb_enum = PixelblazeEnumerator(log=log)
+    pb_enum = PixelblazeConnector(arg)
     
     try:
-        asyncio.gather(*[pb_enum.start(), pixelblaze_connector(pb_enum, arg)], return_exceptions=True)
+        asyncio.gather(pb_enum.discovery(), return_exceptions=True)
         loop.run_forever()
             
     except (KeyboardInterrupt, SystemExit):
