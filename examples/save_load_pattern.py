@@ -129,7 +129,7 @@ def main():
     loop = asyncio.get_event_loop()
     loop.set_debug(arg.debug)
     
-    if not valid_ip(arg.pixelblaze_ip)
+    if not valid_ip(arg.pixelblaze_ip):
         log.critical('Must supply a valid ip address, {} is not valid'.format(arg.pixelblaze_ip))
         return
 

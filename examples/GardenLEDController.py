@@ -190,7 +190,7 @@ class LEDController(PixelblazeClient):
             #wait for MQTT connection
             if await self._waitForMQTT():
                 #subscribe to base topic (no pb name needed) for commands (other than in mode 2)
-                #self.subscribe('{}/#'.format(self.topic))
+                self.subscribe('{}/#'.format(self.topic))
                 #subscribe to slave mode topic for receiving rgb values in mode 2
                 self.subscribe('{}/primary_rgb'.format(self.pubtopic))
             self.log.info('Set Active pattern')

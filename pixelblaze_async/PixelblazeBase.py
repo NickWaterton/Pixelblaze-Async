@@ -33,9 +33,10 @@
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
  N Waterton V 1.0.1 5th april 2021: Minor fixes.
+ N Waterton V 1.0.2 7th april 2021: Minor fixes.
 '''
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 import sys, re, os
 from ast import literal_eval
@@ -68,9 +69,9 @@ class PixelblazeBase():
     CONT  = 2
     END   = 4
 
-    invalid_commands = ['start', 'stop', 'subscribe', 'start_ws']
+    invalid_commands = ['start', 'stop', 'subscribe', 'unsubscribe', 'start_ws']
     
-    __version__ = "1.0.1"
+    __version__ = "1.0.2"
 
     def __init__(self, pixelblaze_ip=None,
                        user=None,
