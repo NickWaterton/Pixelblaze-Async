@@ -12,6 +12,7 @@ NOTE: this implements a different way of using an async library!
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
  N Waterton V1.0.2 6th April 20201; moved valid_ip to utils
+ N Waterton V1.0.3 21st April 20201; fixed some bugs
 '''
 
 import sys, json
@@ -28,7 +29,7 @@ except (ImportError, ModuleNotFoundError):
     from PixelblazeClient import PixelblazeClient
     
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 class PixelblazeBackup(PixelblazeClient):
     '''
@@ -40,7 +41,7 @@ class PixelblazeBackup(PixelblazeClient):
     'index.txt' (self.index_file) is a text file that can be read as a reference for pid's to names in the archive.
     '''
     
-    __version__ = "1.0.1"
+    __version__ = "1.0.3"
     
     
     def __init__(self, pixelblaze_ip=None, filename=None, patterns=None, action='list'):           
@@ -88,6 +89,7 @@ class PixelblazeBackup(PixelblazeClient):
         restore a list of patterns or all patterns from zip file
         '''
         await self.start_ws()
+        await asyncio.sleep(1)
         try:
             restore_patterns = await self.get_patterns_to_restore()
             with ZipFile(self.filename) as myzip:
@@ -120,6 +122,7 @@ class PixelblazeBackup(PixelblazeClient):
         #this takes a while (if it's a long list) so increase cache timeout (or we will retrieve the pattern list every 5 seconds)
         self.cache_timeout = 30
         self.log.info('Backing up {}({}) to {}'.format(self.name, self.ip, self.filename))
+        await asyncio.sleep(1)
         try:
             if not self.patterns:
                 self.patterns = await self._get_patterns()

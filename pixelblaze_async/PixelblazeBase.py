@@ -34,9 +34,10 @@
  N Waterton V 1.0 16th March 2021: Initial release
  N Waterton V 1.0.1 5th april 2021: Minor fixes.
  N Waterton V 1.0.2 7th april 2021: Minor fixes.
+ N Waterton V 1.0.3 12th april 2021: Minor fixes, added _handle_binary_data() and _ready()
 '''
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 import sys, re, os
 from ast import literal_eval
@@ -71,7 +72,7 @@ class PixelblazeBase():
 
     invalid_commands = ['start', 'stop', 'subscribe', 'unsubscribe', 'start_ws']
     
-    __version__ = "1.0.2"
+    __version__ = "1.0.3"
 
     def __init__(self, pixelblaze_ip=None,
                        user=None,
@@ -762,6 +763,14 @@ class PixelblazeBase():
             return None, None
         return None
         
+    async def _ready(self):
+        '''
+        returns when initial commands complete
+        ie when we have pb name
+        '''
+        while not self.name:
+            await asyncio.sleep(1)
+        
     async def start_ws(self):
         '''
         Alternative start function
@@ -770,8 +779,7 @@ class PixelblazeBase():
         await self.start()
         #wait for websocket
         await self._waitForWS()
-        while not self.name:
-            await asyncio.sleep(1)
+        await self._ready()
 
     async def start(self):
         if not self.ip:
@@ -848,6 +856,12 @@ class PixelblazeBase():
         l_data = len(data)
         return '{}{}'.format(data[:min(l_data, length)], '...' if l_data>length else '')
         
+    async def _handle_binary_data(self, data):
+        '''
+        Override this if you want to handle binary data directly
+        '''
+        pass
+        
     async def getWSConnected(self):
         return bool(not self.ws.closed if self.ws else False)
         
@@ -856,6 +870,7 @@ class PixelblazeBase():
             self.log.error('pixelblase ip is not defined')
             return
         self.log.info('Connecting websocket {}'.format(self.ws_url))
+        timing = self.loop.time()
         try:
             timeout = aiohttp.ClientTimeout(total=None, connect=self.timeout)
             async with aiohttp.ClientSession() as session:
@@ -875,13 +890,19 @@ class PixelblazeBase():
                                 self._decode_topics(msg_json)
                         if msg.type == aiohttp.WSMsgType.BINARY:
                             msg_bin = msg.data
-                            if self.debug:
-                                l_data = len(msg_bin)
-                                if not self.debug:
+                            l_data = len(msg_bin)
+                            if not self.debug:
+                                if msg_bin[0] == self.data_type['preview_frame']:   #if updates are on, get a lot of these
+                                    if self.loop.time() - timing > 1:
+                                        self.log.info('Received: {} preview_frame bytes'.format(l_data))
+                                        timing = self.loop.time()
+                                else:
                                     self.log.info('Received: {} binary data bytes'.format(l_data))
+                            else:
                                 self.log.debug('Received binary data: len: {} {}'.format(l_data, self._truncate_bytes(msg_bin)))
                             if self.q_binary:
                                 await self.binary_q.put(msg_bin)
+                            await self._handle_binary_data(msg_bin)
                         elif msg.type == aiohttp.WSMsgType.CLOSED:
                             self.log.info('WS closed')
                             break
