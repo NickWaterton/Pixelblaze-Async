@@ -65,6 +65,14 @@ class PixelblazeBase():
                  'program_list'         :7,
                  'pixel_map'            :8,
                  'output_board_config'  :9,}
+                 
+    upgrade_code = {0:  'Unknown',
+                    1:  'Checking ...',
+                    2:  'Updating',
+                    3:  'Error',
+                    4:  'Up to date',
+                    5:  'Upgrade Available',
+                    6:  'Update Complete'}
                   
     START = 1
     CONT  = 2

@@ -33,6 +33,7 @@
  MQTT interface for pixelblaze v3
  N Waterton V 1.0 16th March 2021: Initial release
  N Waterton V1.0.1 6th April 2021: Minor fixes, added deletePattern, setMaxBrightness, setName, setcolorOrder
+ N Waterton V1.0.2 25th April 2021: added upgradeVersion, fixed getUpgradeState
 '''
 
 '''
@@ -49,11 +50,10 @@ commands NOT implemented yet:
     {'autoOffEnable: bool}
     {'autoOffStart': 'hrs:mins'}
     {'autoOffEnd': 'hrs:mins'}
-    {'upgradeVersion': "update" or "check", 'getUpgradeState': bool}
     {'getPlaylist': "_defaultplaylist_"}
 '''
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 import sys, json
 import base64
@@ -74,7 +74,7 @@ class PixelblazeClient(PixelblazeBase):
     commands for PixelblazeBase
     '''
     
-    __version__ = "1.0.1"
+    __version__ = "1.0.2"
     
     def __init__(self, pixelblase_ip=None,
                        user=None,
@@ -495,13 +495,64 @@ class PixelblazeClient(PixelblazeBase):
             #self.log.exception(e)
         return None
         
-    async def getUpgradeState(self):
+    async def upgradeVersion(self):
+        '''
+        upgrades firmware if update is available
+        code means:
+        0:  Unknown
+        1:  Checking ...
+        2:  Running Update
+        3:  Error
+        4:  Up to date
+        5:  Upgrade Available
+        6:  Update Complete
+        see upgrade_code
+        returns code, text of code meaning
+        '''
+        result, text = await self.getUpgradeState()
+        if result in [2, 5]:
+            if result == 5:
+                self.log.info('Firmware Update available')
+                await self._ws_send({"upgradeVersion" : "update" })
+            while True:
+                await asyncio.sleep(0.5)
+                result, text = await self.getUpgradeState(False)
+                if result == 2:
+                    self.log.info("Upgrading... please wait: progress: {}".format(text))
+                else:
+                    self.log.info("Upgrade: {}".format(text))
+                    break
+        return result, text
+        
+    async def getUpgradeState(self, check=True):
         '''
         gets upgrade state
-        returns True, False or None if state could not be retrieved
+        receives: {"upgradeState":{"code":0}}
+        code means:
+        0:  Unknown
+        1:  Checking ...
+        2:  Running Update
+        3:  Error
+        4:  Up to date
+        5:  Upgrade Available
+        6:  Update Complete
+        see upgrade_code
+        returns code, text of code meaning
         '''
-        result = await self._ws_send({"getUpgradeState" : True }, expect='upgradeState')
-        return bool(result.get('code')) if result else None
+        if check:
+            await self._ws_send({"upgradeVersion" : "check" })
+        while True:
+            result = await self._ws_send({"getUpgradeState" : True }, expect='upgradeState')
+            if isinstance(result, dict):
+                text = result.get("progress", self.upgrade_code.get(result.get("code", 0), 'Unknow Code'))
+                result = result.get("code", 0)
+            else:
+                text = self.upgrade_code.get(result, 'Unknow Code')
+                
+            if result != 1 or not check:
+                break
+            await asyncio.sleep(1)
+        return result, text
         
     async def sendUpdates(self, on=False):
         '''

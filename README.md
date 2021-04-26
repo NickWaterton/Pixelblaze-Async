@@ -26,7 +26,7 @@ and pausing and unpausing.   See API docs for `startSequencer()`, `pauseSequence
 `playSequencer()` below.
 
 ## Requirements
-Python 3.6-3.8 (written and tested on 3.6.9)
+Python 3.6-3.8 (written and tested on 3.6.9, and 3.8.5)
 
 * aiohttp (installable via pip, or from https://github.com/aio-libs/aiohttp )
 * paho-mqtt (installable via pip) min version v1.5.0
@@ -351,7 +351,22 @@ Gets source text for PID or name and uncomprsses it to plain text (for storing i
 Returns the plain text of the pattern or `None`.
 
 #### getUpgradeState()
-returns `True` or `False` if an upgrade is available, `None` if state could not be retrieved
+Returns a tuple consisting of a code integer, and a string giving the meaning of the code.
+Return values:
+0:  Unknown
+1:  Checking ...
+2:  Running Update
+3:  Error
+4:  Up to date
+5:  Upgrade Available
+6:  Update Complete
+
+If code 2 is returned, the string may contain the current progress, eg `File 1/2 277458 bytes remain`.
+
+#### upgradeVersion()
+Checks to see if an upgrade is available, if so, starts a firmware upgrade.
+While firmware is being upgraded, reports the progress every 0.5 s.
+returns code and string the same as `getUpgradeState()`, but will be 3,4 or 6.
 
 #### getVars()
 Returns a dictionary containing all vars exported from the active pattern
